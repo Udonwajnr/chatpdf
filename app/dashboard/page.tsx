@@ -1,68 +1,64 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, LogOut, MessageSquare, Plus, Settings, User } from "lucide-react"
-import { FileUploader } from "@/app/components/file-uploader"
-import { PDFCard } from "@/app/components/pdf-card"
+import { FileText, Upload } from "lucide-react"
+import Header from "../components/Header"
+import { PDFCard } from "../components/pdf-card"
+import { useUser } from "@clerk/nextjs"
+// import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
+interface PDF {
+  id: string
+  name: string
+  pages: number
+  date: string
+  url: string
+}
 
 export default function DashboardPage() {
-  const [pdfs, setPdfs] = useState([
-    { id: 1, name: "Research Paper.pdf", pages: 12, date: "2023-10-15" },
-    { id: 2, name: "Financial Report.pdf", pages: 24, date: "2023-10-10" },
-    { id: 3, name: "Product Documentation.pdf", pages: 36, date: "2023-09-28" },
-  ])
+  const [pdfs, setPdfs] = useState<PDF[]>([])
+  const [loading, setLoading] = useState(true)
+  const { user } = useUser()
 
-  const handleUpload = (files: File[]) => {
-    // In a real app, you would upload these files to your backend
-    const newPdfs = files.map((file, index) => ({
-      id: pdfs.length + index + 1,
-      name: file.name,
-      pages: Math.floor(Math.random() * 50) + 1, // Mock page count
-      date: new Date().toISOString().split("T")[0],
-    }))
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await fetch("/api/documents")
+        if (!response.ok) {
+          throw new Error("Failed to fetch documents")
+        }
 
-    setPdfs([...newPdfs, ...pdfs])
-  }
+        const data = await response.json()
+        setPdfs(data.documents)
+      } catch (error) {
+        console.error("Error fetching documents:", error)
+        toast("Error",{
+          description: "Failed to load your documents. Please try again later.",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDocuments()
+  }, [toast])
 
   return (
-    <div className="flex min-h-screen flex-col justify-center items-center">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">ChatPDF</span>
-          </div>
-          <nav className="hidden gap-6 md:flex">
-            <Link href="/dashboard" className="text-sm font-medium text-primary">
-              Dashboard
-            </Link>
-            <Link href="/settings" className="text-sm font-medium hover:text-primary">
-              Settings
-            </Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon">
-              <User className="h-5 w-5" />
-              <span className="sr-only">User</span>
-            </Button>
-            <Button variant="ghost" size="icon">
-              <LogOut className="h-5 w-5" />
-              <span className="sr-only">Log out</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="flex min-h-screen flex-col">
+      <Header />
       <main className="flex-1 container py-8">
         <div className="flex flex-col gap-8">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" /> New Chat
-            </Button>
+            <Link href="/upload">
+              <Button className="gap-2">
+                <Upload className="h-4 w-4" /> Upload PDF
+              </Button>
+            </Link>
           </div>
 
           <Tabs defaultValue="documents" className="w-full">
@@ -70,45 +66,84 @@ export default function DashboardPage() {
               <TabsTrigger value="documents">My Documents</TabsTrigger>
               <TabsTrigger value="chats">Recent Chats</TabsTrigger>
             </TabsList>
-            <TabsContent value="documents" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upload PDF</CardTitle>
-                  <CardDescription>Upload your PDF documents to chat with them</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FileUploader onUpload={handleUpload} />
-                </CardContent>
-              </Card>
-
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {pdfs.map((pdf) => (
-                  <PDFCard key={pdf.id} pdf={pdf} />
-                ))}
-              </div>
+            <TabsContent value="documents" className="space-y-6 mt-6">
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+                  <p className="mt-4 text-muted-foreground">Loading your documents...</p>
+                </div>
+              ) : pdfs.length > 0 ? (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {pdfs.map((pdf) => (
+                    <PDFCard key={pdf.id} pdf={pdf} />
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Upload your first PDF</CardTitle>
+                    <CardDescription>Get started by uploading a PDF document to chat with</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col items-center justify-center py-8">
+                    <div className="rounded-full bg-primary/10 p-6 mb-4">
+                      <FileText className="h-12 w-12 text-primary" />
+                    </div>
+                    <p className="text-center text-muted-foreground mb-6 max-w-md">
+                      Upload your research papers, reports, or any PDF document and start asking questions about its
+                      content.
+                    </p>
+                    <Link href="/upload">
+                      <Button className="gap-2">
+                        <Upload className="h-4 w-4" /> Upload PDF
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
-            <TabsContent value="chats" className="space-y-6">
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {pdfs.map((pdf) => (
-                  <Card key={pdf.id} className="overflow-hidden">
-                    <CardHeader className="p-4">
-                      <CardTitle className="text-lg truncate">{pdf.name}</CardTitle>
-                      <CardDescription>Last chat: {pdf.date}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <div className="text-sm text-muted-foreground">3 conversations</div>
-                    </CardContent>
-                    <CardFooter className="p-4 pt-0 flex justify-between">
-                      <Button variant="outline" size="sm" className="gap-1">
-                        <MessageSquare className="h-4 w-4" /> Continue
+            <TabsContent value="chats" className="space-y-6 mt-6">
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+                  <p className="mt-4 text-muted-foreground">Loading your recent chats...</p>
+                </div>
+              ) : pdfs.length > 0 ? (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {pdfs.map((pdf) => (
+                    <Card key={pdf.id} className="overflow-hidden">
+                      <CardHeader className="p-4">
+                        <CardTitle className="text-lg truncate">{pdf.name}</CardTitle>
+                        <CardDescription>Last chat: {pdf.date}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <div className="text-sm text-muted-foreground">
+                          Continue your conversation about this document
+                        </div>
+                      </CardContent>
+                      <CardFooter className="p-4 pt-0 flex justify-between">
+                        <Link href={`/chat/${pdf.id}`}>
+                          <Button variant="outline" size="sm" className="gap-1">
+                            Continue Chat
+                          </Button>
+                        </Link>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <p className="text-center text-muted-foreground mb-6">
+                      You haven't started any chats yet. Upload a document to get started.
+                    </p>
+                    <Link href="/upload">
+                      <Button className="gap-2">
+                        <Upload className="h-4 w-4" /> Upload PDF
                       </Button>
-                      <Button variant="ghost" size="sm" className="gap-1">
-                        <Settings className="h-4 w-4" /> Manage
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
         </div>

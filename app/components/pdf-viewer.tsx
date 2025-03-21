@@ -2,51 +2,78 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronLeft, ChevronRight, Download, Search, ZoomIn, ZoomOut } from "lucide-react"
+import { ChevronLeft, ChevronRight, Download, Search, X, ZoomIn, ZoomOut } from "lucide-react"
+import { Document, Page, pdfjs } from "react-pdf"
+import "react-pdf/dist/esm/Page/AnnotationLayer.css"
+import "react-pdf/dist/esm/Page/TextLayer.css"
 
-export function PDFViewer() {
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(24) // This would come from the actual PDF
-  const [zoomLevel, setZoomLevel] = useState(100)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [showSearch, setShowSearch] = useState(false)
+// Set up the worker for PDF.js
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+
+interface PDFViewerProps {
+  pdfUrl: string
+}
+
+export function PDFViewer({ pdfUrl }: PDFViewerProps) {
+  const [numPages, setNumPages] = useState<number | null>(null)
+  const [pageNumber, setPageNumber] = useState<number>(1)
+  const [scale, setScale] = useState<number>(1.0)
+  const [searchQuery, setSearchQuery] = useState<string>("")
+  const [showSearch, setShowSearch] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(true)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Reset to page 1 when a new PDF is loaded
+    setPageNumber(1)
+    setLoading(true)
+  }, [pdfUrl])
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages)
+    setLoading(false)
+  }
 
   const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1)
-    }
+    setPageNumber((prevPageNumber) => Math.max(prevPageNumber - 1, 1))
   }
 
   const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1)
+    if (numPages) {
+      setPageNumber((prevPageNumber) => Math.min(prevPageNumber + 1, numPages))
     }
   }
 
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number.parseInt(e.target.value)
-    if (!isNaN(value) && value >= 1 && value <= totalPages) {
-      setCurrentPage(value)
+    if (!isNaN(value) && numPages && value >= 1 && value <= numPages) {
+      setPageNumber(value)
     }
   }
 
   const handleZoomIn = () => {
-    if (zoomLevel < 200) {
-      setZoomLevel(zoomLevel + 10)
-    }
+    setScale((prevScale) => Math.min(prevScale + 0.1, 2.0))
   }
 
   const handleZoomOut = () => {
-    if (zoomLevel > 50) {
-      setZoomLevel(zoomLevel - 10)
-    }
+    setScale((prevScale) => Math.max(prevScale - 0.1, 0.5))
   }
 
   const toggleSearch = () => {
     setShowSearch(!showSearch)
+  }
+
+  const handleDownload = () => {
+    if (pdfUrl) {
+      const link = document.createElement("a")
+      link.href = pdfUrl
+      link.download = pdfUrl.split("/").pop() || "document.pdf"
+      link.target = "_blank"
+      link.click()
+    }
   }
 
   return (
@@ -54,7 +81,7 @@ export function PDFViewer() {
       {/* PDF Toolbar */}
       <div className="flex items-center justify-between border-b p-2 bg-muted/30">
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={handlePreviousPage} disabled={currentPage === 1}>
+          <Button variant="ghost" size="icon" onClick={handlePreviousPage} disabled={pageNumber <= 1 || loading}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
 
@@ -62,35 +89,41 @@ export function PDFViewer() {
             <Input
               type="number"
               min={1}
-              max={totalPages}
-              value={currentPage}
+              max={numPages || 1}
+              value={pageNumber}
               onChange={handlePageInputChange}
               className="w-14 h-8 text-center"
+              disabled={loading}
             />
-            <span className="mx-1 text-sm text-muted-foreground">of {totalPages}</span>
+            <span className="mx-1 text-sm text-muted-foreground">of {numPages || "?"}</span>
           </div>
 
-          <Button variant="ghost" size="icon" onClick={handleNextPage} disabled={currentPage === totalPages}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleNextPage}
+            disabled={!numPages || pageNumber >= numPages || loading}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={toggleSearch}>
+          <Button variant="ghost" size="icon" onClick={toggleSearch} disabled={loading}>
             <Search className="h-4 w-4" />
           </Button>
 
-          <Button variant="ghost" size="icon" onClick={handleZoomOut} disabled={zoomLevel <= 50}>
+          <Button variant="ghost" size="icon" onClick={handleZoomOut} disabled={scale <= 0.5 || loading}>
             <ZoomOut className="h-4 w-4" />
           </Button>
 
-          <span className="text-xs w-12 text-center">{zoomLevel}%</span>
+          <span className="text-xs w-12 text-center">{Math.round(scale * 100)}%</span>
 
-          <Button variant="ghost" size="icon" onClick={handleZoomIn} disabled={zoomLevel >= 200}>
+          <Button variant="ghost" size="icon" onClick={handleZoomIn} disabled={scale >= 2.0 || loading}>
             <ZoomIn className="h-4 w-4" />
           </Button>
 
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" onClick={handleDownload} disabled={loading}>
             <Download className="h-4 w-4" />
           </Button>
         </div>
@@ -106,79 +139,73 @@ export function PDFViewer() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="text-sm"
             />
-            <Button size="sm" variant="secondary">
+            <Button size="sm" variant="secondary" disabled={!searchQuery.trim()}>
               Find
+            </Button>
+            <Button size="sm" variant="ghost" onClick={toggleSearch}>
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
       )}
 
       {/* PDF Content */}
-      <div className="flex-1 overflow-auto bg-muted/20 p-4 flex items-start justify-center">
-        <div
-          className="bg-white shadow-lg rounded-sm transition-all duration-200"
-          style={{
-            width: `${8.5 * (zoomLevel / 100)}in`,
-            height: `${11 * (zoomLevel / 100)}in`,
-            transform: `scale(${zoomLevel / 100})`,
-            transformOrigin: "top center",
-          }}
-        >
-          {/* This would be replaced with an actual PDF renderer */}
-          <div className="w-full h-full p-8 flex flex-col">
-            <h1 className="text-2xl font-bold mb-4">Business AI Report</h1>
-            <h2 className="text-xl font-semibold mb-2">Page {currentPage}</h2>
-
-            <div className="space-y-4 text-sm">
-              <p>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam auctor, nisl eget ultricies tincidunt,
-                nisl nisl aliquam nisl, eget ultricies nisl nisl eget nisl. Nullam auctor, nisl eget ultricies
-                tincidunt, nisl nisl aliquam nisl, eget ultricies nisl nisl eget nisl.
-              </p>
-
-              <h3 className="text-lg font-medium">Key Findings</h3>
-
-              <ul className="list-disc pl-5 space-y-2">
-                <li>AI implementation resulted in 45% efficiency improvement</li>
-                <li>Cost reduction of 30% across departments</li>
-                <li>Customer satisfaction increased by 25%</li>
-                <li>Return on investment achieved within 8 months</li>
-              </ul>
-
-              <p>
-                Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
-                exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in
-                reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-              </p>
-
-              <div className="border p-3 bg-muted/10 rounded">
-                <h4 className="font-medium">Case Study: Company XYZ</h4>
-                <p className="mt-1">
-                  Implementation of AI chatbots reduced customer service response time by 80% while handling 3x more
-                  inquiries.
-                </p>
-              </div>
-            </div>
+      <div ref={containerRef} className="flex-1 overflow-auto bg-muted/20 p-4 flex items-start justify-center">
+        {loading && (
+          <div className="flex items-center justify-center h-full w-full">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
           </div>
-        </div>
+        )}
+
+        <Document
+          file={pdfUrl}
+          onLoadSuccess={onDocumentLoadSuccess}
+          loading={
+            <div className="flex items-center justify-center h-full w-full">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+            </div>
+          }
+          error={
+            <div className="flex flex-col items-center justify-center h-full w-full p-4">
+              <p className="text-destructive font-medium mb-2">Failed to load PDF</p>
+              <p className="text-sm text-muted-foreground text-center mb-4">
+                The document could not be loaded. Please try again or check if the file is valid.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                Retry
+              </Button>
+            </div>
+          }
+        >
+          <Page
+            pageNumber={pageNumber}
+            scale={scale}
+            renderTextLayer={true}
+            renderAnnotationLayer={true}
+            className="shadow-lg"
+          />
+        </Document>
       </div>
 
       {/* Page thumbnails */}
-      <div className="border-t h-20 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full p-2 gap-2">
-          {Array.from({ length: 10 }, (_, i) => (
-            <button
-              key={i}
-              className={`flex-shrink-0 w-12 h-16 border rounded ${
-                currentPage === i + 1 ? "border-primary bg-primary/5" : "border-muted"
-              }`}
-              onClick={() => setCurrentPage(i + 1)}
-            >
-              <div className="w-full h-full flex items-center justify-center text-xs">{i + 1}</div>
-            </button>
-          ))}
+      {numPages && numPages > 1 && (
+        <div className="border-t h-20 overflow-x-auto overflow-y-hidden">
+          <div className="flex h-full p-2 gap-2">
+            {Array.from(new Array(numPages), (_, index) => (
+              <button
+                key={index}
+                className={`flex-shrink-0 w-12 h-16 border rounded ${
+                  pageNumber === index + 1 ? "border-primary bg-primary/5" : "border-muted"
+                }`}
+                onClick={() => setPageNumber(index + 1)}
+                disabled={loading}
+              >
+                <div className="w-full h-full flex items-center justify-center text-xs">{index + 1}</div>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -1,3 +1,7 @@
+"use client"
+
+import type React from "react"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -5,14 +9,40 @@ import { FileText, MessageSquare, Trash } from "lucide-react"
 
 interface PDFCardProps {
   pdf: {
-    id: number
+    id: string
     name: string
     pages: number
     date: string
+    url?: string
   }
 }
 
 export function PDFCard({ pdf }: PDFCardProps) {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/documents/${pdf.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete document")
+      }
+
+      // Refresh the page to update the document list
+      window.location.reload()
+    } catch (error) {
+      console.error("Error deleting document:", error)
+      alert("Failed to delete document. Please try again.")
+    }
+  }
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="p-4 pb-0">
@@ -39,6 +69,7 @@ export function PDFCard({ pdf }: PDFCardProps) {
           variant="ghost"
           size="sm"
           className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={handleDelete}
         >
           <Trash className="h-4 w-4" /> Delete
         </Button>

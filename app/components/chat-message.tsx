@@ -1,17 +1,19 @@
 import { cn } from "@/lib/utils"
 import { FileText, User } from "lucide-react"
+import OpenAI from 'openai';
 
 interface ChatMessageProps {
   message: {
-    id: number
-    role: "system" | "user" | "assistant"
-    content: string
-  }
+    id: number;
+    role: "system" | "user" | "assistant";
+    content: string;
+  };
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user"
   const isSystem = message.role === "system"
+  
 
   if (isSystem) {
     return <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">{message.content}</div>
