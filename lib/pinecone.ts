@@ -8,12 +8,12 @@ import { getEmbeddings } from "./embeddings";
 import { convertToAscii } from "./utils";
 
 export const getPineconeClient = () => {
-  if (!process.env.PINECONE_API_KEY) {
+  if (!process.env.NEXT_PUBLIC_PINECONE_API_KEY) {
     throw new Error("PINECONE_API_KEY is not set.");
   }
 
   return new Pinecone({
-    apiKey: process.env.PINECONE_API_KEY!,
+    apiKey: process.env.NEXT_PUBLIC_PINECONE_API_KEY!,
   });
 };
 
@@ -27,6 +27,8 @@ type PDFPage = {
 export async function loadS3IntoPinecone(fileKey: string) {
   console.log(`[INFO] Downloading file: ${fileKey} from S3...`);
   const file_name = await downloadFromS3(fileKey);
+
+  console.log(file_name)
 
   if (!file_name) {
     throw new Error("[ERROR] Could not download file from S3.");

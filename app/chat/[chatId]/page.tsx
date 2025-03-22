@@ -8,6 +8,8 @@ import { ArrowLeft, FileText, Send, SplitSquareVertical } from "lucide-react"
 import { ChatMessage } from "@/app/components/chat-message"
 import { PDFViewer } from "@/app/components/pdf-viewer"
 import { toast } from "sonner"
+import { useParams } from "next/navigation"
+import axios from "axios"
 interface ChatPageProps {
   params: {
     chatId: string
@@ -27,8 +29,12 @@ interface ChatDocument {
   url: string
 }
 
-export default function ChatPage({ params }: ChatPageProps) {
-  const { chatId } = params
+// This is a client component that receives params from the router
+export default function ChatPage() {
+  // Access chatId directly from params
+  const { chatId } = useParams();
+
+
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [showPdfSidebar, setShowPdfSidebar] = useState(true)
@@ -38,6 +44,7 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [aiMessage, setAiMessage] = useState<string>("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  console.log(messages,aiMessage,input)
   // Fetch chat document and history
   useEffect(() => {
     const fetchChatData = async () => {
@@ -95,7 +102,7 @@ export default function ChatPage({ params }: ChatPageProps) {
         }
       } catch (error) {
         console.error("Error fetching chat data:", error)
-        toast("Error",{
+        toast("Error", {
           description: "Failed to load chat data. Please try again.",
         })
 
@@ -115,7 +122,7 @@ export default function ChatPage({ params }: ChatPageProps) {
     if (chatId) {
       fetchChatData()
     }
-  }, [chatId, toast])
+  }, [chatId])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -124,62 +131,53 @@ export default function ChatPage({ params }: ChatPageProps) {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
-
+  
     // Add user message
     const userMessage: Message = {
       id: Date.now(),
       role: "user",
       content: input,
     }
-
+  
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setAiMessage("")
-
+  
     try {
       setIsLoading(true)
-
+  
       // Prepare messages for API
       const messagesToSend = [...messages.filter((m) => m.role === "user" || m.role === "assistant"), userMessage]
-
-      // Send message to API
-      const response = await fetch("/api/chat", {
-        method: "POST",
+  
+      // Send message to API using Axios
+      const response = await axios.post("/api/chat", {
+        messages: messagesToSend,
+        chatId,
+      }, {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messages: messagesToSend,
-          chatId,
-        }),
+        responseType: "stream", // Ensure streaming response is handled
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to send message")
-      }
-
+  
       // Handle streaming response
-      const reader = response.body?.getReader()
+      const reader = response.data.getReader()
       const decoder = new TextDecoder()
-
-      if (!reader) {
-        throw new Error("Failed to read response")
-      }
-
+  
       let done = false
       let accumulatedResponse = ""
-
+  
       while (!done) {
         const { value, done: doneReading } = await reader.read()
         done = doneReading
-
+  
         if (value) {
           const chunkText = decoder.decode(value)
           accumulatedResponse += chunkText
           setAiMessage(accumulatedResponse)
         }
       }
-
+  
       // Add AI response to messages
       if (accumulatedResponse) {
         const aiResponseMessage: Message = {
@@ -187,15 +185,15 @@ export default function ChatPage({ params }: ChatPageProps) {
           role: "assistant",
           content: accumulatedResponse,
         }
-
+  
         setMessages((prev) => [...prev, aiResponseMessage])
       }
     } catch (error) {
       console.error("Error sending message:", error)
-      toast("Error",{
+      toast("Error", {
         description: "Failed to send message. Please try again.",
       })
-
+  
       // Add error message
       setMessages((prev) => [
         ...prev,

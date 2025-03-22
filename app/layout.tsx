@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import {
   ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
+
 } from '@clerk/nextjs'
 import Header from "./components/Header";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -39,7 +35,7 @@ export default function RootLayout({
       >
         
         <ClerkProvider>
-        <Header/>
+        {/* <Header/> */}
           {children}
         </ClerkProvider>
       </body>

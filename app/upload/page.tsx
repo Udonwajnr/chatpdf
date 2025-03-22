@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { uploadToS3 } from "@/lib/s3"
 import { Progress } from "@/components/ui/progress"
+import axios from "axios";
 
 export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false)
@@ -17,66 +18,63 @@ export default function UploadPage() {
   const router = useRouter()
 
   const handleUpload = async (files: File[]) => {
-    if (files.length === 0) return
-
+    if (files.length === 0) return;
+  
     try {
-      setIsUploading(true)
-      setCurrentStep("Uploading to storage...")
-      setUploadProgress(10)
-
+      setIsUploading(true);
+      setCurrentStep("Uploading to storage...");
+      setUploadProgress(10);
+  
       // Process the first file (we'll handle one at a time for simplicity)
-      const file = files[0]
-
+      const file = files[0];
+  
       // Upload to S3
-      setUploadProgress(30)
-      const { file_key, file_name } = await uploadToS3(file)
-
+      setUploadProgress(30);
+      const { file_key, file_name } = await uploadToS3(file);
+  
       // Create chat
-      setCurrentStep("Processing document...")
-      setUploadProgress(60)
-
-      const createChatResponse = await fetch("/api/create-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          file_key,
-          file_name,
-        }),
-      })
-
-      if (!createChatResponse.ok) {
-        throw new Error("Failed to create chat")
+      setCurrentStep("Processing document...");
+      setUploadProgress(60);
+  
+      const createChatResponse = await axios.post("/api/create-chat", {
+        file_key,
+        file_name,
+      });
+  
+      console.log(createChatResponse);
+  
+      if (createChatResponse.status !== 200) {
+        throw new Error("Failed to create chat");
       }
-
-      setUploadProgress(90)
-      setCurrentStep("Preparing chat interface...")
-
-      const { chat_id } = await createChatResponse.json()
-
+  
+      setUploadProgress(90);
+      setCurrentStep("Preparing chat interface...");
+  
+      const { chat_id } = createChatResponse.data;
+  
       // Success notification
-      toast("Upload successful!",{
+      toast("Upload successful!", {
         description: "Your PDF has been uploaded and is ready for chat.",
-      })
-
-      setUploadProgress(100)
-
+      });
+  
+      setUploadProgress(100);
+  
       // Redirect to the chat page with the correct chatId
       setTimeout(() => {
-        router.push(`/chat/${chat_id}`)
-      }, 1000) // Small delay to show 100% progress
-    } catch (error) {
-      console.error("Upload error:", error)
-      toast("Upload failed",{
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-      })
-      setUploadProgress(0)
-      setCurrentStep(null)
+        router.push(`/chat/${chat_id}`);
+      }, 1000); // Small delay to show 100% progress
+    } catch (error:any) {
+      console.error("Upload error:", error);
+      toast("Upload failed", {
+        description:
+          error.response?.data?.error || "An unexpected error occurred",
+      });
+      setUploadProgress(0);
+      setCurrentStep(null);
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen flex-col">

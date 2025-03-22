@@ -10,14 +10,14 @@ export const runtime = "edge";
 const config = new Configuration({
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
 });
+
 const openai = new OpenAIApi(config);
 
 export async function POST(req: Request) {
   try {
     const { messages, chatId } = await req.json();
 
-    console.log(req.json())
-
+    
     // Validate chat existence
     const _chats = await db.select().from(chats).where(eq(chats.id, chatId));
     if (_chats.length !== 1) {
