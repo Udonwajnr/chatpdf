@@ -6,6 +6,7 @@ import {
     text,
     timestamp,
     varchar,
+    jsonb
   } from "drizzle-orm/pg-core";
   
   export const userSystemEnum = pgEnum("user_system_enum", ["system", "user"]);
@@ -30,6 +31,36 @@ import {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     role: userSystemEnum("role").notNull(),
   });
+
+  export const flashcards = pgTable("flashcards", {
+    id: serial("id").primaryKey(),
+    chatId: text("chat_id")
+      .references(() => chats.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: text("user_id").notNull(),
+    question: text("question").notNull(),
+    answer: text("answer").notNull(),
+    tags: jsonb("tags").default([]),
+    topic: text("topic"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  })
+  
+  // New schema for annotations
+  export const annotations = pgTable("annotations", {
+    id: serial("id").primaryKey(),
+    chatId: text("chat_id")
+      .references(() => chats.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: text("user_id").notNull(),
+    type: text("type").notNull(), // "highlight", "note", "bookmark"
+    pageNumber: integer("page_number").notNull(),
+    position: jsonb("position").notNull(), // { x, y }
+    color: text("color"),
+    text: text("text"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  })
+  
+  
   
   // export const userSubscriptions = pgTable("user_subscriptions", {
   //   id: serial("id").primaryKey(),
