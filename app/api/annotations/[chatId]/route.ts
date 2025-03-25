@@ -4,14 +4,14 @@ import { db } from "@/lib/db"
 import { chats, annotations } from "@/lib/db/schema"
 import { eq, and } from "drizzle-orm"
 
-export async function GET(req: Request, { params }: { params: { chatId: string } }) {
+export async function GET(req: Request, { params }: { params:Promise<{ chatId: string }> }) {
   try {
     const { userId } = await auth()
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const chatId = params.chatId
+    const {chatId} = await params
 
     // Verify the chat exists and belongs to the user
     const chatDoc = await db

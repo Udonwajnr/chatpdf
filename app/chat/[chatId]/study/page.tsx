@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect,use } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,19 +11,20 @@ import { ExportOptions } from "@/app/components/export/export-option"
 import { toast } from "sonner"
 import { PDFAnnotator } from "@/app/components/annotations/pdf-annimator"
 
-export default function StudyPage({ params }: { params: { chatId: string } }) {
+export default function StudyPage({ params }: { params: Promise<{ chatId: string }> }) {
   const [document, setDocument] = useState<{
     id: string
     name: string
     url: string
   } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const {chatId} = use(params)
 
   useEffect(() => {
     const fetchDocumentInfo = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(`/api/chat/${params.chatId}`)
+        const response = await fetch(`/api/chat/${chatId}`)
 
         if (!response.ok) {
           throw new Error("Failed to fetch document information")
@@ -46,7 +47,7 @@ export default function StudyPage({ params }: { params: { chatId: string } }) {
     }
 
     fetchDocumentInfo()
-  }, [params.chatId, toast])
+  }, [chatId, toast])
 
   if (isLoading) {
     return (
@@ -82,7 +83,7 @@ export default function StudyPage({ params }: { params: { chatId: string } }) {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center">
           <div className="flex items-center gap-2">
-            <Link href={`/chat/${params.chatId}`}>
+            <Link href={`/chat/${chatId}`}>
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -93,7 +94,7 @@ export default function StudyPage({ params }: { params: { chatId: string } }) {
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Link href={`/chat/${params.chatId}`}>
+            <Link href={`/chat/${chatId}`}>
               <Button variant="outline" size="sm" className="gap-1">
                 <BookOpen className="h-4 w-4" /> Chat View
               </Button>
@@ -113,19 +114,19 @@ export default function StudyPage({ params }: { params: { chatId: string } }) {
 
           <div className="mt-6">
             <TabsContent value="flashcards" className="mt-0">
-              <FlashcardGenerator chatId={params.chatId} pdfUrl={document.url} />
+              <FlashcardGenerator chatId={chatId} pdfUrl={document.url} />
             </TabsContent>
 
             <TabsContent value="notes" className="mt-0">
-              <NotesExtractor chatId={params.chatId} pdfUrl={document.url} />
+              <NotesExtractor chatId={chatId} pdfUrl={document.url} />
             </TabsContent>
 
             <TabsContent value="annotations" className="mt-0">
-              <PDFAnnotator chatId={params.chatId} pdfUrl={document.url} />
+              <PDFAnnotator chatId={chatId} pdfUrl={document.url} />
             </TabsContent>
 
             <TabsContent value="export" className="mt-0">
-              <ExportOptions chatId={params.chatId} pdfName={document.name} />
+              <ExportOptions chatId={chatId} pdfName={document.name} />
             </TabsContent>
           </div>
         </Tabs>
