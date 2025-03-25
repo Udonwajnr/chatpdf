@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef,use } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,43 +8,37 @@ import { ArrowLeft, FileText, Send, SplitSquareVertical } from "lucide-react"
 import { ChatMessage } from "@/app/components/chat-message"
 import { PDFViewer } from "@/app/components/pdf-viewer"
 import { toast } from "sonner"
-import { useParams } from "next/navigation"
-import axios from "axios"
-interface ChatPageProps {
-  params: {
-    chatId: string
-  }
-}
-
-interface Message {
-  id: number
-  role: "system" | "user" | "assistant"
-  content: string
-  createdAt?: Date
-}
-
-interface ChatDocument {
-  id: string
-  name: string
-  url: string
-}
-
-// This is a client component that receives params from the router
-export default function ChatPage() {
-  // Access chatId directly from params
-  const { chatId } = useParams();
 
 
+// This is the correct way to type the props for a client component
+export default function ChatPage({ params }: { params: Promise<{ chatId: string }> }) {
+  // Access chatId directly from params - don't use the 'use' hook here
+  const {chatId} = use(params)
+  
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [showPdfSidebar, setShowPdfSidebar] = useState(true)
   const [isMobilePdfView, setIsMobilePdfView] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [document, setDocument] = useState<ChatDocument | null>(null)
-  const [aiMessage, setAiMessage] = useState<string>("")
+  const [streamingMessage, setStreamingMessage] = useState<string>("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  console.log(messages,aiMessage,input)
+  // Interface definitions
+  interface Message {
+    id: number
+    role: "system" | "user" | "assistant"
+    content: string
+    createdAt?: Date
+  }
+
+  interface ChatDocument {
+    id: string
+    name: string
+    url: string
+  }
+
+  // Rest of your component remains the same...
   // Fetch chat document and history
   useEffect(() => {
     const fetchChatData = async () => {
@@ -83,7 +77,7 @@ export default function ChatPage() {
             // Format messages
             const formattedMessages = messagesData.map((msg: any) => ({
               id: msg.id,
-              role: msg.role,
+              role: msg.role === "system" ? "assistant" : msg.role, // Convert "system" role to "assistant" for display
               content: msg.content,
               createdAt: new Date(msg.createdAt),
             }))
@@ -127,57 +121,71 @@ export default function ChatPage() {
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, aiMessage])
+  }, [messages, streamingMessage])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
-  
+
     // Add user message
     const userMessage: Message = {
       id: Date.now(),
       role: "user",
       content: input,
     }
-  
+
     setMessages((prev) => [...prev, userMessage])
     setInput("")
-    setAiMessage("")
-  
+    setStreamingMessage("")
+
     try {
       setIsLoading(true)
-  
+
       // Prepare messages for API
-      const messagesToSend = [...messages.filter((m) => m.role === "user" || m.role === "assistant"), userMessage]
-  
-      // Send message to API using Axios
-      const response = await axios.post("/api/chat", {
-        messages: messagesToSend,
-        chatId,
-      }, {
+      const messagesToSend = [...messages.filter((m) => m.role === "user" || m.role === "assistant"), userMessage].map(
+        (msg) => ({
+          role: msg.role === "assistant" ? "system" : msg.role, // Convert "assistant" role to "system" for API
+          content: msg.content,
+        }),
+      )
+
+      // Send message to API
+      const response = await fetch("/api/chat", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        responseType: "stream", // Ensure streaming response is handled
+        body: JSON.stringify({
+          messages: messagesToSend,
+          chatId,
+        }),
       })
-  
-      // Handle streaming response
-      const reader = response.data.getReader()
+
+      if (!response.ok) {
+        throw new Error("Failed to send message")
+      }
+
+      // Process streaming response
+      const reader = response.body?.getReader()
       const decoder = new TextDecoder()
-  
+
+      if (!reader) {
+        throw new Error("Failed to read response")
+      }
+
       let done = false
       let accumulatedResponse = ""
-  
+
       while (!done) {
         const { value, done: doneReading } = await reader.read()
         done = doneReading
-  
+
         if (value) {
           const chunkText = decoder.decode(value)
           accumulatedResponse += chunkText
-          setAiMessage(accumulatedResponse)
+          setStreamingMessage(accumulatedResponse)
         }
       }
-  
+
       // Add AI response to messages
       if (accumulatedResponse) {
         const aiResponseMessage: Message = {
@@ -185,7 +193,7 @@ export default function ChatPage() {
           role: "assistant",
           content: accumulatedResponse,
         }
-  
+
         setMessages((prev) => [...prev, aiResponseMessage])
       }
     } catch (error) {
@@ -193,7 +201,7 @@ export default function ChatPage() {
       toast("Error", {
         description: "Failed to send message. Please try again.",
       })
-  
+
       // Add error message
       setMessages((prev) => [
         ...prev,
@@ -205,7 +213,7 @@ export default function ChatPage() {
       ])
     } finally {
       setIsLoading(false)
-      setAiMessage("")
+      setStreamingMessage("")
     }
   }
 
@@ -278,17 +286,17 @@ export default function ChatPage() {
                   )}
 
                   {/* Streaming AI response */}
-                  {aiMessage && (
+                  {streamingMessage && (
                     <div className="flex items-start gap-3">
                       <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md bg-secondary/10 text-secondary">
                         <FileText className="h-4 w-4" />
                       </div>
-                      <div className="rounded-lg bg-secondary/10 p-3 text-sm">{aiMessage}</div>
+                      <div className="rounded-lg bg-secondary/10 p-3 text-sm">{streamingMessage}</div>
                     </div>
                   )}
 
                   {/* Loading indicator for AI response */}
-                  {isLoading && messages.length > 0 && !aiMessage && (
+                  {isLoading && messages.length > 0 && !streamingMessage && (
                     <div className="flex items-start gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary/10 text-secondary">
                         <FileText className="h-4 w-4" />

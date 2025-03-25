@@ -9,8 +9,9 @@ import { FileText, Upload } from "lucide-react"
 import Header from "../components/Header"
 import { PDFCard } from "../components/pdf-card"
 import { useUser } from "@clerk/nextjs"
-// import { useToast } from "@/hooks/use-toast"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+
 interface PDF {
   id: string
   name: string
@@ -24,6 +25,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const { user } = useUser()
 
+  console.log(pdfs)
+
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
@@ -31,7 +34,6 @@ export default function DashboardPage() {
         if (!response.ok) {
           throw new Error("Failed to fetch documents")
         }
-
         const data = await response.json()
         setPdfs(data.documents)
       } catch (error) {
@@ -49,6 +51,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <Header/>
       <main className="flex-1 container py-8">
         <div className="flex flex-col gap-8">
           <div className="flex items-center justify-between">
@@ -109,7 +112,15 @@ export default function DashboardPage() {
               ) : pdfs.length > 0 ? (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {pdfs.map((pdf) => (
-                    <Card key={pdf.id} className="overflow-hidden">
+                    <Card 
+                    key={pdf.id} 
+                     className={cn(
+                            "overflow-hidden transition-all duration-300 hover:shadow-lg group relative",
+                            "bg-gradient-to-br from-background to-background/80 hover:from-primary/5 hover:to-background",
+                          )}>
+                             {/* Decorative accent */}
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/80 to-primary/30 opacity-70 group-hover:opacity-100 transition-opacity" />
+
                       <CardHeader className="p-4">
                         <CardTitle className="text-lg truncate">{pdf.name}</CardTitle>
                         <CardDescription>Last chat: {pdf.date}</CardDescription>
@@ -121,7 +132,7 @@ export default function DashboardPage() {
                       </CardContent>
                       <CardFooter className="p-4 pt-0 flex justify-between">
                         <Link href={`/chat/${pdf.id}`}>
-                          <Button variant="outline" size="sm" className="gap-1">
+                          <Button variant="outline" size="sm" className="gap-1.5 w-full sm:w-auto bg-primary/90 text-white">
                             Continue Chat
                           </Button>
                         </Link>

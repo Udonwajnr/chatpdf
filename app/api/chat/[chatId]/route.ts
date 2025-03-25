@@ -4,14 +4,18 @@ import { db } from "@/lib/db"
 import { chats } from "@/lib/db/schema"
 import { eq, and } from "drizzle-orm"
 
-export async function GET(req: Request, { params }: { params: { chatId: string } }) {
-    try {
-      const { userId } = await auth()
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ chatId: string }> } // ✅ Corrected params type
+) {
+  try {
+    const { userId } = await auth()
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const chatId = params.chatId
+    const { chatId } = await params // ✅ No need for await since it's not a Promise
+
     if (!chatId) {
       return NextResponse.json({ error: "Chat ID is required" }, { status: 400 })
     }
@@ -26,7 +30,7 @@ export async function GET(req: Request, { params }: { params: { chatId: string }
         createdAt: chats.createdAt,
       })
       .from(chats)
-      .where(and(eq(chats.id, chatId), eq(chats.userId, userId)))
+      .where(and(eq(chats.id, Number(chatId)), eq(chats.userId, userId)))
       .execute()
 
     if (!chatDoc || chatDoc.length === 0) {
@@ -39,4 +43,3 @@ export async function GET(req: Request, { params }: { params: { chatId: string }
     return NextResponse.json({ error: "Failed to fetch chat" }, { status: 500 })
   }
 }
-

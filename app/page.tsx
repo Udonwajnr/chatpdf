@@ -25,6 +25,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col justify-center items-center">
       {/* Header */}
+      <Header/>
       <main className="flex-1 ">
         {/* Hero Section */}
         <section className="container space-y-6 py-12 md:py-24 lg:py-32">

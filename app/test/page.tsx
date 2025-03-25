@@ -1,17 +1,26 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
 
-export default async function Page() {
-  // Get the userId from auth() -- if null, the user is not signed in
-  const { userId } = await auth()
+import { getContext } from '@/lib/context'
 
-  // Protect the route by checking if the user is signed in
-  if (!userId) {
-    return <div>Sign in to view this page</div>
+async function testGetContext() {
+  const query = "What is AI?";
+  const fileKey = "/sample-file-key";
+
+  try {
+    const context = await getContext(query, fileKey);
+    console.log(context);
+  } catch (error) {
+    console.error("Error while testing getContext:", error);
   }
+}
 
-  // Get the Backend API User object when you need access to the user's information
-  const user = await currentUser()
+testGetContext();
 
-  // Use `user` to render user details or create UI elements
-  return <div>Welcome, {user.firstName}!</div>
+export default function TestPage(){
+ return(
+  <>
+    <button> 
+      test the get context button
+    </button>
+  </>
+ ) 
 }

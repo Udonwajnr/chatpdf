@@ -27,6 +27,11 @@ export async function getMatchesFromEmbeddings(
 
 export async function getContext(query: string, fileKey: string) {
   const queryEmbeddings = await getEmbeddings(query);
+  if (!queryEmbeddings || !Array.isArray(queryEmbeddings)) {
+    console.error("Failed to generate embeddings");
+    return "";
+  }
+
   const matches = await getMatchesFromEmbeddings(queryEmbeddings, fileKey);
 
   const qualifyingDocs = matches.filter(
@@ -39,6 +44,11 @@ export async function getContext(query: string, fileKey: string) {
   };
 
   let docs = qualifyingDocs.map((match) => (match.metadata as Metadata).text);
-  // 5 vectors
-  return docs.join("\n").substring(0, 3000);
+  
+  return docs.length > 0 ? docs.join("\n").substring(0, 3000) : "No relevant context found.";
+}
+
+
+export async function testingIt(query:string,fileKey:string){
+  return console.log("hello")
 }
